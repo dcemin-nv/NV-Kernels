@@ -111,6 +111,28 @@ static int mtk_sdw_disable_reg_clock(struct mtk_sdw *mst)
 	return ret;
 }
 
+static int mtk_sdw_enable_power(struct mtk_sdw *mst)
+{
+	int ret;
+
+	ret = mst->clk_ops->enable_power_domain(mst);
+	if (ret)
+		dev_err(mst->dev, "failed to enable power, ret %d\n", ret);
+
+	return ret;
+}
+
+static int mtk_sdw_disable_power(struct mtk_sdw *mst)
+{
+	int ret;
+
+	ret = mst->clk_ops->disable_power_domain(mst);
+	if (ret)
+		dev_err(mst->dev, "failed to disable power, ret %d\n", ret);
+
+	return ret;
+}
+
 /* =======================================================================
  * ASoC DAI layer  (ALSA <-> SoundWire stream binding)
  * =======================================================================
@@ -1033,11 +1055,67 @@ static void mtk_sdw_remove(struct platform_device *pdev)
 		mtk_sdw_link_deinit(mst, i);
 }
 
+static int __maybe_unused mtk_sdw_suspend(struct device *dev)
+{
+	struct mtk_sdw *mst = dev_get_drvdata(dev);
+	int i, ret;
+
+	for (i = 0; i < mst->num_links; i++) {
+		struct mtk_sdw_link *link = &mst->links[i];
+		struct mtk_sdw_core *core = &link->core;
+
+		mtk_sdw_enable_irq(core, false);
+
+		ret = mtk_sdw_disable_top_clock(mst, i);
+		if (ret) {
+			dev_err(dev, "mtk_sdw_disable_top_clock failed: %d\n",
+				ret);
+			return ret;
+		}
+
+		ret = mtk_sdw_disable_power(mst);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
+}
+
+static int __maybe_unused mtk_sdw_resume(struct device *dev)
+{
+	struct mtk_sdw *mst = dev_get_drvdata(dev);
+	int i, ret;
+
+	for (i = 0; i < mst->num_links; i++) {
+		struct mtk_sdw_link *link = &mst->links[i];
+		struct mtk_sdw_core *core = &link->core;
+
+		ret = mtk_sdw_enable_power(mst);
+		if (ret)
+			return ret;
+
+		ret = mtk_sdw_enable_top_clock(mst, i);
+		if (ret) {
+			dev_err(dev, "mtk_sdw_enable_top_clock failed: %d\n",
+				ret);
+			return ret;
+		}
+
+		mtk_sdw_enable_irq(core, true);
+	}
+
+	return 0;
+}
+
 static const struct acpi_device_id mtk_sdw_acpi_match[] = {
 	{ "NVDA9100", 0 },
 	{ }
 };
 MODULE_DEVICE_TABLE(acpi, mtk_sdw_acpi_match);
+
+static const struct dev_pm_ops mtk_sdw_pm_ops = {
+	SET_SYSTEM_SLEEP_PM_OPS(mtk_sdw_suspend, mtk_sdw_resume)
+};
 
 static struct platform_driver mtk_sdw_driver = {
 	.probe  = mtk_sdw_probe,
@@ -1045,6 +1123,7 @@ static struct platform_driver mtk_sdw_driver = {
 	.driver = {
 		.name             = "mtk-soundwire",
 		.acpi_match_table = mtk_sdw_acpi_match,
+		.pm = &mtk_sdw_pm_ops,
 	},
 };
 module_platform_driver(mtk_sdw_driver);
