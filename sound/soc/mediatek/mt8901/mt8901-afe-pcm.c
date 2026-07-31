@@ -1834,13 +1834,21 @@ static int __maybe_unused mt8901_afe_suspend(struct device *dev)
 	ret = mt8901_afe_disable_main_clock(afe);
 	if (ret) {
 		dev_err(dev, "mt8901_afe_disable_main_clock failed: %d\n", ret);
-		return ret;
+		goto err_enable_apll_cg;
 	}
 
 	ret = mt8901_afe_disable_mtcmos(afe, AUDIO_PD);
-	if (ret)
+	if (ret) {
 		dev_err(dev, "disable MTCMOS failed\n");
+		goto err_enable_main_clock;
+	}
 
+	return 0;
+
+err_enable_main_clock:
+	mt8901_afe_enable_main_clock(afe);
+err_enable_apll_cg:
+	mt8901_afe_enable_apll_top_con_cg(afe);
 	return ret;
 }
 
@@ -1858,15 +1866,22 @@ static int __maybe_unused mt8901_afe_resume(struct device *dev)
 	ret = mt8901_afe_enable_main_clock(afe);
 	if (ret) {
 		dev_err(dev, "mt8901_afe_enable_main_clock failed: %d\n", ret);
-		return ret;
+		goto err_disable_mtcmos;
 	}
 
 	ret = mt8901_afe_enable_apll_top_con_cg(afe);
 	if (ret) {
 		dev_err(dev, "mt8901_afe_enable_apll_top_con_cg failed: %d\n",
 			ret);
+		goto err_disable_main_clock;
 	}
 
+	return 0;
+
+err_disable_main_clock:
+	mt8901_afe_disable_main_clock(afe);
+err_disable_mtcmos:
+	mt8901_afe_disable_mtcmos(afe, AUDIO_PD);
 	return ret;
 }
 
