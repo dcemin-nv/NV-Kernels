@@ -640,7 +640,7 @@ static void mtk_sdw_slave_status_work(struct work_struct *work)
 
 		dev0_stat = core_get_slave_status(core, 0);
 
-		if (dev0_stat == MCP_SLAVEINTSTAT_ATTACHED) {
+		if (dev0_stat == MCP_SLAVESTAT_ATTACHED) {
 			slv_intstat = MCP_SLAVEINTSTAT_ATTACHED;
 			dev_info(core->dev,
 				 "[%u] slave attached Dev0Stat:0x%x Retries:%d",

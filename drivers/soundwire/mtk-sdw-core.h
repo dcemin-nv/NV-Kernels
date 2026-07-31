@@ -127,6 +127,9 @@
 
 /* MCP_SLAVESTAT: 2 bits/slave; MCP_SLAVEINTSTAT: 4 bits/slave */
 #define MCP_SLAVESTAT_STATUS(x, n)    (((x) >> ((n) * 2)) & 0x3)
+#define MCP_SLAVESTAT_UNATTACHED      0x0
+#define MCP_SLAVESTAT_ATTACHED        0x1
+#define MCP_SLAVESTAT_ALERT           0x2
 #define MCP_SLAVEINTSTAT_STATUS(x, n) (((x) >> ((n) * 4)) & 0xf)
 #define MCP_SLAVEINTSTAT_NOT_PRESENT  BIT(0)
 #define MCP_SLAVEINTSTAT_ATTACHED     BIT(1)
