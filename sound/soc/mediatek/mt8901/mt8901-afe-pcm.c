@@ -29,7 +29,8 @@
 #define MT8901_MEMIF_MAXLEN 64
 #define MT8901_CM0_MAX_CH 8
 #define MT8901_CM1_MAX_CH 16
-#define MT8901_CM2_MAX_CH 32
+/* CM2 exposes 16 wired inputs (O064-O079 <- I170-I185), not the HW max 32 */
+#define MT8901_CM2_MAX_CH 16
 #define MT8901_MEMIF_BUFFER_BYTES_ALIGN (0x10)
 
 /* experience values */
