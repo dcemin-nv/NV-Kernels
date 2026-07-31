@@ -792,7 +792,7 @@ static int mtk_sdw_link_init(struct mtk_sdw *mst, int idx)
 	if (ret) {
 		dev_err(mst->dev, "IP%d: bus_master_add failed: %d\n",
 			idx, ret);
-		return ret;
+		goto err_disable_top_clock;
 	}
 
 	//property ready here.
@@ -809,12 +809,16 @@ static int mtk_sdw_link_init(struct mtk_sdw *mst, int idx)
 	ret = mtk_sdw_core_hw_init(core);
 	if (ret) {
 		sdw_bus_master_delete(&core->bus);
-		return ret;
+		goto err_disable_top_clock;
 	}
 
 	mtk_sdw_enable_irq(core, true);
 	dev_info(mst->dev, "IP%d: SoundWire bus ready\n", idx);
 	return 0;
+
+err_disable_top_clock:
+	mtk_sdw_disable_top_clock(mst, idx);
+	return ret;
 }
 
 static void mtk_sdw_link_deinit(struct mtk_sdw *mst, int idx)
