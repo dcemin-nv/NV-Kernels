@@ -1802,7 +1802,13 @@ static const dai_register_cb dai_register_cbs[] = {
 static int mt8901_afe_init_regs(struct mtk_base_afe *afe)
 {
 	static const struct reg_sequence init_regs[] = {
-		{ AFE_IRQ_MCU_EN,      0xffffffff },
+		/*
+		 * Mask all MCU IRQs at init; each memif enables its own bit
+		 * when its stream starts. Unmasking all 32 bits here would
+		 * let sources the handler never clears (bits 22-31 have no
+		 * irq_data mapping) assert the line forever.
+		 */
+		{ AFE_IRQ_MCU_EN,      0x0 },
 		{ AFE_APLL1_TUNER_CFG, 0x332 },
 		{ AFE_APLL2_TUNER_CFG, 0x374 },
 		{ AFE_MEMIF_CON0,      0x9 },
