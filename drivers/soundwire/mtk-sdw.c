@@ -849,7 +849,7 @@ static int mtk_sdw_probe_controller(struct platform_device *pdev)
 
 		core->regs = devm_platform_ioremap_resource(pdev, i);
 		if (IS_ERR(core->regs)) {
-			ret = PTR_ERR(mst->base);
+			ret = PTR_ERR(core->regs);
 			goto err;
 		}
 
