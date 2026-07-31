@@ -625,7 +625,7 @@ int mt8901_afe_set_clock_parent(struct mtk_base_afe *afe, unsigned int mux,
 int mt8901_afe_set_idle_clock_parent(struct mtk_base_afe *afe, bool idle)
 {
 	const char *parent_name;
-	int i, ret;
+	int i, j, ret;
 
 	for (i = 0; i < ARRAY_SIZE(idle_clk_muxes); i++) {
 		parent_name = idle ? idle_clk_muxes[i].idle_parent_name :
@@ -634,8 +634,23 @@ int mt8901_afe_set_idle_clock_parent(struct mtk_base_afe *afe, bool idle)
 		ret = mt8901_afe_set_clock_parent(afe, idle_clk_muxes[i].mux,
 						  parent_name);
 		if (ret)
-			return ret;
+			goto err_rollback;
 	}
 
 	return 0;
+
+err_rollback:
+	/*
+	 * Best effort: re-parent the muxes already switched back to the
+	 * other set, so a failed transition does not leave a mixed
+	 * idle/active clock topology.
+	 */
+	for (j = i - 1; j >= 0; j--) {
+		parent_name = idle ? idle_clk_muxes[j].active_parent_name :
+				     idle_clk_muxes[j].idle_parent_name;
+		mt8901_afe_set_clock_parent(afe, idle_clk_muxes[j].mux,
+					    parent_name);
+	}
+
+	return ret;
 }
