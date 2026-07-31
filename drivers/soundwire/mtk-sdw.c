@@ -168,9 +168,9 @@ static int mtk_sdw_dai_hw_params(struct snd_pcm_substream *substream,
 				return -EINVAL;
 			}
 		} else {
-			last_pdi = pdi;
 			pdi_begin = pdi;
 		}
+		last_pdi = pdi;
 	}
 
 	pdi_count = (channels + ch_per_pdi - 1) / ch_per_pdi;
