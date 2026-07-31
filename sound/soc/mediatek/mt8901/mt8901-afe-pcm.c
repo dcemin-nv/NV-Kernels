@@ -1871,14 +1871,6 @@ static int mt8901_afe_pcm_dev_probe(struct platform_device *pdev)
 	if (irq_id < 0)
 		return dev_err_probe(dev, irq_id, "no irq found");
 
-	ret = devm_request_threaded_irq(dev, irq_id, NULL,
-					mt8901_afe_irq_handler,
-					IRQF_ONESHOT,
-					"AFE_ISR_Handle", (void *)afe);
-	if (ret)
-		return dev_err_probe(dev, ret,
-				     "could not request_irq for AFE_ISR_Handle\n");
-
 	/* init sub_dais */
 	INIT_LIST_HEAD(&afe->sub_dais);
 
@@ -1920,6 +1912,24 @@ static int mt8901_afe_pcm_dev_probe(struct platform_device *pdev)
 	if (ret) {
 		dev_err(dev, "afe init regs failed: %d\n", ret);
 		return ret;
+	}
+
+	/*
+	 * Request the IRQ only once the regmap exists and the IRQ enable
+	 * state has been initialized: the handler dereferences afe->regmap
+	 * unconditionally and firmware (UEFI POST audio) may leave interrupt
+	 * state asserted, so an earlier request can fire into a half-set-up
+	 * driver.
+	 */
+	ret = devm_request_threaded_irq(dev, irq_id, NULL,
+					mt8901_afe_irq_handler,
+					IRQF_ONESHOT,
+					"AFE_ISR_Handle", (void *)afe);
+	if (ret) {
+		mt8901_afe_disable_apll_top_con_cg(afe);
+		mt8901_afe_disable_main_clock(afe);
+		return dev_err_probe(dev, ret,
+				     "could not request_irq for AFE_ISR_Handle\n");
 	}
 
 	/* register component after regcache is in cache-only mode */
