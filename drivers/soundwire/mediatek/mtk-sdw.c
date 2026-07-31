@@ -971,10 +971,10 @@ static int mtk_sdw_probe_controller(struct platform_device *pdev)
 			goto err;
 	}
 
-	clk_on = false;
 	ret = mtk_sdw_disable_reg_clock(mst);
 	if (ret)
 		goto err;
+	clk_on = false;
 
 	ret = mtk_sdw_register_dais(mst);
 	if (ret) {
