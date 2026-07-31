@@ -12,7 +12,7 @@
 #include "mt8901-afe-common.h"
 #include "mt8901-afe-clk.h"
 #include "mt8901-reg.h"
-#include "../../../../drivers/soc/mediatek/power_wrap/inc/pwrap_public.h"
+#include <linux/soc/mediatek/mtk-pwrap.h>
 
 static const unsigned int mt8901_main_clk_muxes[] = {
 	AFE_CLK_VLP_CKSYS_TOP_AUDIO_H_SEL,

@@ -11,7 +11,7 @@
 #include <linux/string.h>
 #include "mtk-sdw-common.h"
 #include "mt8901-afe-clk.h"
-#include "../../soc/mediatek/power_wrap/inc/pwrap_public.h"
+#include <linux/soc/mediatek/mtk-pwrap.h>
 
 #define AUDIO_ENGEN_CON0_USER1   (0x0018)
 #define AUDIO_ENGEN_CON0_APLL2_MASK         BIT(3)

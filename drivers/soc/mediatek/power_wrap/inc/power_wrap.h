@@ -9,7 +9,7 @@
 #include <linux/platform_device.h>
 
 #include "pwrap_scmi.h"
-#include "pwrap_public.h"
+#include <linux/soc/mediatek/mtk-pwrap.h>
 
 #define PWRAP_MAX_COMP_NUM 20
 /* Number of scalar constraint fields before the comp_states array */
