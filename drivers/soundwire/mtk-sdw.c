@@ -180,6 +180,8 @@ static int mtk_sdw_dai_hw_params(struct snd_pcm_substream *substream,
 		return -EINVAL;
 	}
 
+	mdai->use_group_sync = false;
+
 	if (pdi_count > 1) {
 		mdai->use_group_sync = true;
 
@@ -204,8 +206,10 @@ static int mtk_sdw_dai_hw_params(struct snd_pcm_substream *substream,
 	mdai->top_pdi_params = devm_kcalloc(mst->dev, pdi_count,
 					    sizeof(*mdai->top_pdi_params),
 					    GFP_KERNEL);
-	if (!mdai->top_pdi_params)
-		return -ENOMEM;
+	if (!mdai->top_pdi_params) {
+		ret = -ENOMEM;
+		goto err_group_sync;
+	}
 	mdai->pdi_count = pdi_count;
 	mdai->need_enable_delay = TRUE;
 	for (i = 0; i < pdi_count; i++) {
@@ -258,8 +262,20 @@ static int mtk_sdw_dai_hw_params(struct snd_pcm_substream *substream,
 					     &mdai->pdi_params[i]);
 	}
 
-	return sdw_stream_add_master(&mdai->link->core.bus, &sconfig, &pconfig,
-				     1, mdai->sruntime);
+	ret = sdw_stream_add_master(&mdai->link->core.bus, &sconfig, &pconfig,
+				    1, mdai->sruntime);
+	if (ret)
+		goto err_group_sync;
+
+	return 0;
+
+err_group_sync:
+	if (mdai->group_sync_id > 0) {
+		mtk_sdw_top_group_sync_release(mst, mdai->group_sync_id);
+		mdai->group_sync_id = 0;
+	}
+	mdai->use_group_sync = false;
+	return ret;
 }
 
 static int mtk_sdw_dai_hw_free(struct snd_pcm_substream *substream,
@@ -282,6 +298,7 @@ static int mtk_sdw_dai_hw_free(struct snd_pcm_substream *substream,
 		mtk_sdw_top_group_sync_release(mst, mdai->group_sync_id);
 		mdai->group_sync_id = 0;
 	}
+	mdai->use_group_sync = false;
 
 	devm_kfree(mst->dev, mdai->top_pdi_params);
 	return ret;
