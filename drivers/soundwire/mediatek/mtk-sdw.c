@@ -1061,8 +1061,7 @@ static int __maybe_unused mtk_sdw_suspend(struct device *dev)
 	int i, ret;
 
 	for (i = 0; i < mst->num_links; i++) {
-		struct mtk_sdw_link *link = &mst->links[i];
-		struct mtk_sdw_core *core = &link->core;
+		struct mtk_sdw_core *core = &mst->links[i].core;
 
 		mtk_sdw_enable_irq(core, false);
 
@@ -1070,15 +1069,24 @@ static int __maybe_unused mtk_sdw_suspend(struct device *dev)
 		if (ret) {
 			dev_err(dev, "mtk_sdw_disable_top_clock failed: %d\n",
 				ret);
-			return ret;
+			goto err_reenable;
 		}
-
-		ret = mtk_sdw_disable_power(mst);
-		if (ret)
-			return ret;
 	}
 
+	/* The power domain is master-wide, not per link. */
+	ret = mtk_sdw_disable_power(mst);
+	if (ret)
+		goto err_reenable;
+
 	return 0;
+
+err_reenable:
+	while (--i >= 0)
+		mtk_sdw_enable_top_clock(mst, i);
+	for (i = 0; i < mst->num_links; i++)
+		mtk_sdw_enable_irq(&mst->links[i].core, true);
+
+	return ret;
 }
 
 static int __maybe_unused mtk_sdw_resume(struct device *dev)
@@ -1086,25 +1094,34 @@ static int __maybe_unused mtk_sdw_resume(struct device *dev)
 	struct mtk_sdw *mst = dev_get_drvdata(dev);
 	int i, ret;
 
-	for (i = 0; i < mst->num_links; i++) {
-		struct mtk_sdw_link *link = &mst->links[i];
-		struct mtk_sdw_core *core = &link->core;
+	/* The power domain is master-wide, not per link. */
+	ret = mtk_sdw_enable_power(mst);
+	if (ret)
+		return ret;
 
-		ret = mtk_sdw_enable_power(mst);
-		if (ret)
-			return ret;
+	for (i = 0; i < mst->num_links; i++) {
+		struct mtk_sdw_core *core = &mst->links[i].core;
 
 		ret = mtk_sdw_enable_top_clock(mst, i);
 		if (ret) {
 			dev_err(dev, "mtk_sdw_enable_top_clock failed: %d\n",
 				ret);
-			return ret;
+			goto err_disable;
 		}
 
 		mtk_sdw_enable_irq(core, true);
 	}
 
 	return 0;
+
+err_disable:
+	while (--i >= 0) {
+		mtk_sdw_enable_irq(&mst->links[i].core, false);
+		mtk_sdw_disable_top_clock(mst, i);
+	}
+	mtk_sdw_disable_power(mst);
+
+	return ret;
 }
 
 static const struct acpi_device_id mtk_sdw_acpi_match[] = {
