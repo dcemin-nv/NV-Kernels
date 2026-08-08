@@ -1071,28 +1071,18 @@ static int __maybe_unused mtk_sdw_suspend(struct device *dev)
 				ret);
 			goto err_reenable;
 		}
-
-		/*
-		 * The SSPM power refcount is one vote per link (the firmware
-		 * initializes it to the link count, and the Windows driver
-		 * relinquishes once per SoundWire IP), so vote per link, not
-		 * per master, or the count never reaches zero and the SoC
-		 * cannot enter PPS7/PPS8.
-		 */
-		ret = mtk_sdw_disable_power(mst);
-		if (ret) {
-			mtk_sdw_enable_top_clock(mst, i);
-			goto err_reenable;
-		}
 	}
+
+	/* The power domain is master-wide, not per link. */
+	ret = mtk_sdw_disable_power(mst);
+	if (ret)
+		goto err_reenable;
 
 	return 0;
 
 err_reenable:
-	while (--i >= 0) {
-		mtk_sdw_enable_power(mst);
+	while (--i >= 0)
 		mtk_sdw_enable_top_clock(mst, i);
-	}
 	for (i = 0; i < mst->num_links; i++)
 		mtk_sdw_enable_irq(&mst->links[i].core, true);
 
@@ -1104,19 +1094,18 @@ static int __maybe_unused mtk_sdw_resume(struct device *dev)
 	struct mtk_sdw *mst = dev_get_drvdata(dev);
 	int i, ret;
 
+	/* The power domain is master-wide, not per link. */
+	ret = mtk_sdw_enable_power(mst);
+	if (ret)
+		return ret;
+
 	for (i = 0; i < mst->num_links; i++) {
 		struct mtk_sdw_core *core = &mst->links[i].core;
-
-		/* One power vote per link; see mtk_sdw_suspend(). */
-		ret = mtk_sdw_enable_power(mst);
-		if (ret)
-			goto err_disable;
 
 		ret = mtk_sdw_enable_top_clock(mst, i);
 		if (ret) {
 			dev_err(dev, "mtk_sdw_enable_top_clock failed: %d\n",
 				ret);
-			mtk_sdw_disable_power(mst);
 			goto err_disable;
 		}
 
@@ -1129,8 +1118,8 @@ err_disable:
 	while (--i >= 0) {
 		mtk_sdw_enable_irq(&mst->links[i].core, false);
 		mtk_sdw_disable_top_clock(mst, i);
-		mtk_sdw_disable_power(mst);
 	}
+	mtk_sdw_disable_power(mst);
 
 	return ret;
 }
