@@ -218,6 +218,9 @@ CONFIG_SND_SOC_SDCA_HID                         policy<{'amd64': 'y', 'arm64': '
 CONFIG_SND_SOC_SDCA_IRQ                         policy<{'amd64': 'y', 'arm64': 'y'}>
 CONFIG_SND_SOC_SDCA_IRQ                         note<'Derived symbols pulled in by SND_SOC_MTK_SDCA selecting the SDCA framework.'>
 CONFIG_SND_SOC_SDW_UTILS                        policy<{'amd64': 'm', 'arm64': 'm'}>
+CONFIG_SND_SOC_SOF_MT8901                       policy<{'arm64': 'm'}>
+CONFIG_SND_SOC_SOF_MT8901                       note<'MediaTek MT8901 ACPI DSP power-management support.'>
+
 CONFIG_SND_SOC_TAS2783_SDW                      policy<{'amd64': 'm', 'arm64': 'n'}>
 CONFIG_SND_SOC_MTK_SDCA                         note<'SDCA support for codecs on the MediaTek SoundWire master (N1x audio). Introduced disabled; enabled by the audio config change once the power_wrap client API lands.'>
 

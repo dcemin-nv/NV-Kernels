@@ -45,7 +45,7 @@ config SND_SOC_SOF_MT8195
 config SND_SOC_SOF_MT8901
 	tristate "SOF support for MT8901 audio DSP"
 	depends on ARCH_MEDIATEK && ACPI
-	depends on MTK_PMIC_WRAP
+	depends on MTK_POWER_WRAP
 	help
 	  This adds support for Sound Open Firmware for Mediatek platforms
 	  using the mt8901 processors.

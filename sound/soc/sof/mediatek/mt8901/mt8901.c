@@ -13,7 +13,7 @@
 #include <linux/pm_runtime.h>
 #include <linux/slab.h>
 
-#include "pwrap_public.h"
+#include <linux/soc/mediatek/mtk-pwrap.h>
 
 #define MT8901_AUTOSUSPEND_DELAY_MS	100
 
@@ -64,28 +64,31 @@ static int sof_mt8901_probe(struct platform_device *pdev)
 	}
 
 	priv->pwrap_ctrl = mtk_pwrap_dev_probe(acpi_path.pointer);
-	if (priv->pwrap_ctrl) {
-		dev_dbg(dev, "pwrap probe succeeded for %s\n",
-			(char *)acpi_path.pointer);
-	} else {
-		dev_warn(dev, "pwrap probe failed for %s\n",
-			 (char *)acpi_path.pointer);
+	if (!priv->pwrap_ctrl) {
+		ret = dev_err_probe(dev, -ENODEV,
+				    "pwrap probe failed for %s\n",
+				    (char *)acpi_path.pointer);
+		kfree(acpi_path.pointer);
+		return ret;
 	}
+	dev_dbg(dev, "pwrap probe succeeded for %s\n",
+		(char *)acpi_path.pointer);
 
 	kfree(acpi_path.pointer);
 	platform_set_drvdata(pdev, priv);
 
 	pm_runtime_set_autosuspend_delay(dev, MT8901_AUTOSUSPEND_DELAY_MS);
 	pm_runtime_use_autosuspend(dev);
-	pm_runtime_mark_last_busy(dev);
 
 	ret = pm_runtime_set_active(dev);
 	if (ret) {
 		dev_err(dev, "failed to set runtime active (%d)\n", ret);
+		pm_runtime_dont_use_autosuspend(dev);
 		goto err_pwrap_remove;
 	}
 
 	pm_runtime_enable(dev);
+	pm_runtime_mark_last_busy(dev);
 	pm_runtime_idle(dev);
 
 	return 0;
@@ -103,13 +106,23 @@ static void sof_mt8901_remove(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct sof_mt8901_priv *priv = platform_get_drvdata(pdev);
+	int ret;
 
+	/* SSPM transitions the DSP to D3 as part of abandoning the device. */
+	ret = pm_runtime_resume_and_get(dev);
+	if (ret < 0)
+		dev_warn(dev, "failed to resume before remove (%d)\n", ret);
+
+	pm_runtime_dont_use_autosuspend(dev);
 	pm_runtime_disable(dev);
 
 	if (priv && priv->pwrap_ctrl) {
 		mtk_pwrap_dev_remove(priv->pwrap_ctrl);
 		priv->pwrap_ctrl = NULL;
 	}
+
+	if (ret >= 0)
+		pm_runtime_put_noidle(dev);
 }
 
 static int sof_mt8901_runtime_suspend(struct device *dev)
