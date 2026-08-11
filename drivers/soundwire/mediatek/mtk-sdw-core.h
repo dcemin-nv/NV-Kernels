@@ -190,7 +190,7 @@ struct mtk_sdw_core {
 	bool interrupt_enabled;
 	u16 attached_slaves;
 	void *priv;
-	struct delayed_work work;
+	struct delayed_work status_work;
 	unsigned int dev0_repoll_count;
 	unsigned int bus_reset_count;
 };

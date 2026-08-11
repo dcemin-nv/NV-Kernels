@@ -643,7 +643,7 @@ void mtk_sdw_enable_irq(struct mtk_sdw_core *core, bool enable)
 	core->interrupt_enabled = enable;
 
 	if (!enable)
-		cancel_delayed_work_sync(&core->work);
+		cancel_delayed_work_sync(&core->status_work);
 
 	core_updatel(core, MCP_INTMASK, MCP_INT_IRQ,
 		     enable ? MCP_INT_IRQ : 0);
@@ -778,7 +778,7 @@ static int mtk_sdw_update_slave_status(struct mtk_sdw_core *core,
 static void mtk_sdw_slave_status_work(struct work_struct *work)
 {
 	struct mtk_sdw_core *core =
-		container_of(work, struct mtk_sdw_core, work.work);
+		container_of(work, struct mtk_sdw_core, status_work.work);
 	u32 stat0;
 	u32 stat1;
 	u32 dev0_stat;
@@ -830,7 +830,7 @@ static void mtk_sdw_slave_status_work(struct work_struct *work)
 			dev_dbg(core->dev,
 				"[%u] Dev0 still attached, re-polling (%u)\n",
 				core->bus.link_id, core->dev0_repoll_count);
-			schedule_delayed_work(&core->work,
+			schedule_delayed_work(&core->status_work,
 				msecs_to_jiffies(MTK_SDW_DEV0_REPOLL_DELAY_MS));
 		} else if (core->bus_reset_count < MTK_SDW_BUS_RESET_MAX) {
 			core->bus_reset_count++;
@@ -839,9 +839,13 @@ static void mtk_sdw_slave_status_work(struct work_struct *work)
 				 core->bus.link_id, core->dev0_repoll_count,
 				 core->bus_reset_count, MTK_SDW_BUS_RESET_MAX);
 			core->dev0_repoll_count = 0;
-			mtk_sdw_core_bus_reset(core);
-			schedule_delayed_work(&core->work,
-				msecs_to_jiffies(MTK_SDW_BUS_RESET_SETTLE_MS));
+			if (mtk_sdw_core_bus_reset(core))
+				dev_err(core->dev,
+					"[%u] bus reset failed, not re-polling\n",
+					core->bus.link_id);
+			else
+				schedule_delayed_work(&core->status_work,
+					msecs_to_jiffies(MTK_SDW_BUS_RESET_SETTLE_MS));
 		} else {
 			dev_warn(core->dev,
 				 "[%u] Dev0 attach unresolved after %u re-polls and %u bus resets, giving up\n",
@@ -916,7 +920,7 @@ int mtk_sdw_core_init(struct mtk_sdw_core *core)
 	core->bus.port_ops       = &mtk_sdw_core_port_ops;
 	core->bus.compute_params = mtk_sdw_compute_params;
 
-	INIT_DELAYED_WORK(&core->work, mtk_sdw_slave_status_work);
+	INIT_DELAYED_WORK(&core->status_work, mtk_sdw_slave_status_work);
 	return 0;
 }
 
@@ -992,7 +996,7 @@ irqreturn_t mtk_sdw_core_irq(int irq, void *data)
 			 * transitions are then lost).
 			 */
 			mtk_sdw_enable_slave_irq(core, false);
-			schedule_delayed_work(&core->work, 0);
+			schedule_delayed_work(&core->status_work, 0);
 			clearstat &= ~MCP_INT_SLV_MASK;
 		}
 	}

@@ -1008,36 +1008,61 @@ static ssize_t mtk_sdw_bus_reset_write(struct file *file,
 			return -EINVAL;
 
 		core = &mst->links[link].core;
-		core->bus_reset_count = 0;
 
 		dev_info(mst->dev, "IP%u: deep reset (clock cycle)\n", link);
 
+		/*
+		 * Zero the recovery counters only after enable_irq(false) has
+		 * cancelled the status work; a still-running work could write
+		 * them back otherwise.
+		 */
 		mtk_sdw_enable_irq(core, false);
-		mtk_sdw_disable_top_clock(mst, link);
+		core->bus_reset_count = 0;
+		core->dev0_repoll_count = 0;
+
+		ret = mtk_sdw_disable_top_clock(mst, link);
+		if (ret)
+			goto err_reenable;
+
 		msleep(200);
-		mtk_sdw_enable_top_clock(mst, link);
+
+		ret = mtk_sdw_enable_top_clock(mst, link);
+		if (ret)
+			goto err_reenable;
 
 		ret = mtk_sdw_core_hw_init(core);
 		if (ret)
-			return ret;
+			goto err_reenable;
 
 		mtk_sdw_enable_irq(core, true);
-		schedule_delayed_work(&core->work, msecs_to_jiffies(100));
+		schedule_delayed_work(&core->status_work, msecs_to_jiffies(100));
 
 		return count;
+
+err_reenable:
+		mtk_sdw_enable_irq(core, true);
+		return ret;
 	}
 
 	if (link >= mst->num_links)
 		return -EINVAL;
 
 	core = &mst->links[link].core;
-	core->bus_reset_count = 0;
 
+	/*
+	 * Quiesce interrupt handling and the status work (enable_irq(false)
+	 * cancels it) so the reset does not race concurrent register access.
+	 * Zero the recovery counters only after the cancellation, so a
+	 * still-running work cannot write them back.
+	 */
+	mtk_sdw_enable_irq(core, false);
+	core->bus_reset_count = 0;
 	ret = mtk_sdw_core_bus_reset(core);
+	mtk_sdw_enable_irq(core, true);
 	if (ret)
 		return ret;
 
-	schedule_delayed_work(&core->work, msecs_to_jiffies(100));
+	schedule_delayed_work(&core->status_work, msecs_to_jiffies(100));
 
 	return count;
 }
@@ -1180,8 +1205,6 @@ static int mtk_sdw_probe_controller(struct platform_device *pdev)
 	dev_info(dev, "MediaTek SoundWire ready, %d link(s), %d DAI(s)\n",
 		 mst->num_links, mst->num_dais);
 
-	mtk_sdw_debugfs_init(mst);
-
 	return 0;
 
 err:
@@ -1215,6 +1238,8 @@ static int mtk_sdw_probe(struct platform_device *pdev)
 
 		return ret;
 	}
+
+	mtk_sdw_debugfs_init(mst);
 
 	return 0;
 }
