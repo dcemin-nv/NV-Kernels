@@ -2099,8 +2099,17 @@ static int mt8901_afe_pcm_dev_probe(struct platform_device *pdev)
 		goto err_pm_put;
 	}
 
-	pm_runtime_put_sync(dev);
+	ret = pm_runtime_put_sync(dev);
 	afe_priv->pm_runtime_bypass_reg_ctl = false;
+	if (ret < 0) {
+		/*
+		 * The device is still runtime-active: keep the regcache in
+		 * write-through mode and keep the boot-time MTCMOS vote, so
+		 * the software state matches the hardware state.
+		 */
+		dev_warn(dev, "pm_runtime_put_sync failed: %d\n", ret);
+		return 0;
+	}
 
 	regcache_cache_only(afe->regmap, true);
 	regcache_mark_dirty(afe->regmap);

@@ -24,7 +24,7 @@
 #include "mtk-sdw.h"
 #include "mtk-sdw-mach.h"
 #include "mtk-sdw-top.h"
-#include "../bus.h"
+#include "bus.h"
 
 /*
  * Restart (SOFT_RST + quiesce + re-init) every link at probe instead of
