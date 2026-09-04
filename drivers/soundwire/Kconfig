@@ -61,6 +61,7 @@ config SOUNDWIRE_MTK
 	tristate "MediaTek SoundWire Master driver"
 	select SOUNDWIRE_GENERIC_ALLOCATION
 	depends on SND_SOC && ACPI
+	depends on PINCTRL_MT8901
 	select SND_SOC_ACPI
 	help
 	  SoundWire MediaTek Master driver.
